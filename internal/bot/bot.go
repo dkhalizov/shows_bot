@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"shows/clients/tmdb"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"shows/clients"
-	"shows/clients/tmdb"
 	"shows/clients/tvmaze"
 	"shows/internal/config"
 	"shows/internal/database"

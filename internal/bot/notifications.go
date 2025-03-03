@@ -52,7 +52,7 @@ func (b *Bot) checkForNewEpisodes() {
 			episode.ShowID = show.ID
 
 			now := time.Now()
-			thirtyDaysFromNow := now.AddDate(0, 0, 30)
+			thirtyDaysFromNow := now.AddDate(0, 0, 7)
 
 			if episode.AirDate.After(now) && episode.AirDate.Before(thirtyDaysFromNow) {
 
@@ -63,7 +63,6 @@ func (b *Bot) checkForNewEpisodes() {
 				}
 
 				if episodeID != "" {
-
 					b.notifyUsersAboutEpisode(show, &episode)
 				}
 			}
@@ -72,7 +71,6 @@ func (b *Bot) checkForNewEpisodes() {
 }
 
 func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode) {
-
 	userIDs, err := b.dbManager.GetUsersToNotify(episode.ID, show.ID)
 	if err != nil {
 		log.Printf("Error getting users to notify: %v", err)
@@ -80,7 +78,6 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 	}
 
 	for _, userID := range userIDs {
-
 		message := fmt.Sprintf("🔔 *New Episode Alert* 🔔\n\n*%s*\nSeason %d, Episode %d: %s\n\nAirs on %s",
 			show.Name,
 			episode.SeasonNumber,
@@ -90,16 +87,15 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 		)
 
 		if episode.Overview != "" {
-
-			overview := episode.Overview
+			overview := stripHTMLTags(episode.Overview)
 			if len(overview) > 150 {
 				overview = overview[:147] + "..."
 			}
 			message += fmt.Sprintf("\n\n%s", overview)
 		}
-
+		message = escapeMarkdown(message)
 		msg := tgbotapi.NewMessage(userID, message)
-		msg.ParseMode = "Markdown"
+		msg.ParseMode = "MarkdownV2"
 		_, err := b.api.Send(msg)
 
 		if err != nil {

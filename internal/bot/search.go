@@ -11,6 +11,8 @@ import (
 	"shows/internal/models"
 )
 
+var htmlRegexp = regexp.MustCompile(`<[^>]*>`)
+
 type SearchSession struct {
 	Query    string
 	Results  []models.Show
@@ -69,10 +71,23 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 			fmt.Sprintf("%s:%s", ActionDetails, show.ID),
 		)
 
-		followButton := tgbotapi.NewInlineKeyboardButtonData(
-			"✅ Follow",
-			fmt.Sprintf("%s:%s", ActionFollow, show.ID),
-		)
+		followed, err := b.dbManager.IsShowFollowed(chatID, show.ID)
+		if err != nil {
+			log.Printf("Error checking if show is followed: %v", err)
+			continue
+		}
+		var followButton tgbotapi.InlineKeyboardButton
+		if followed {
+			followButton = tgbotapi.NewInlineKeyboardButtonData(
+				"❌ Unfollow",
+				fmt.Sprintf("%s:%s", ActionUnfollow, show.ID),
+			)
+		} else {
+			followButton = tgbotapi.NewInlineKeyboardButtonData(
+				"✅ Follow",
+				fmt.Sprintf("%s:%s", ActionFollow, show.ID),
+			)
+		}
 
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(detailsButton, followButton))
 	}
@@ -94,9 +109,7 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 }
 
 func stripHTMLTags(s string) string {
-
-	re := regexp.MustCompile(`<[^>]*>`)
-	return re.ReplaceAllString(s, " ")
+	return htmlRegexp.ReplaceAllString(s, " ")
 }
 
 func escapeMarkdown(text string) string {

@@ -8,33 +8,15 @@ import (
 )
 
 func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
-
-	query := `
-		SELECT id FROM episodes
-		WHERE provider = $1 AND provider_id = $2
-	`
-
-	var existingID string
-	err := m.db.QueryRow(context.Background(), query, episode.Provider, episode.ProviderID).Scan(&existingID)
-
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-
-	if err == nil {
-
-		return existingID, nil
-	}
-
 	newID := fmt.Sprintf("%s_%s", episode.Provider, episode.ProviderID)
+	episode.ID = newID
 
 	insertQuery := `
-		INSERT INTO episodes (id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id
-	`
+       INSERT INTO episodes (id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict do nothing
+    `
 
-	err = m.db.QueryRow(
+	_, err := m.db.Exec(
 		context.Background(),
 		insertQuery,
 		newID,
@@ -46,7 +28,7 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 		episode.Overview,
 		episode.Provider,
 		episode.ProviderID,
-	).Scan(&newID)
+	)
 
 	if err != nil {
 		return "", err

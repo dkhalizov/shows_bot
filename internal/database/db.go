@@ -168,3 +168,18 @@ func (m *Manager) RecordNotification(userID int64, episodeID string) error {
 	_, err := m.db.Exec(context.Background(), query, userID, episodeID)
 	return err
 }
+
+func (m *Manager) IsShowFollowed(userID int64, showID string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1 FROM user_shows WHERE user_id = $1 AND show_id = $2
+		)
+	`
+
+	var followed bool
+	if err := m.db.QueryRow(context.Background(), query, userID, showID).Scan(&followed); err != nil {
+		return false, err
+	}
+
+	return followed, nil
+}

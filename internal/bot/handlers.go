@@ -47,7 +47,7 @@ func (b *Bot) handleHelpCommand(message *tgbotapi.Message) {
 	helpMsg := `*TV Shows Notification Bot Help*
 
 • Use the Search button to find shows
-• My Shows displays what you're following
+• My Shows displays what you'htmlRegexp following
 • Upcoming shows new episodes for your shows
 • You can also just type a show name to search for it
 
@@ -87,7 +87,7 @@ func (b *Bot) handleListCommand(message *tgbotapi.Message) {
 	}
 
 	if len(shows) == 0 {
-		b.sendMessage(message.Chat.ID, "You're not following any shows yet. Use /search to find shows to follow.")
+		b.sendMessage(message.Chat.ID, "You'htmlRegexp not following any shows yet. Use /search to find shows to follow.")
 		return
 	}
 
@@ -214,7 +214,7 @@ func (b *Bot) handleCallbackQuery(callbackQuery *tgbotapi.CallbackQuery) {
 		helpText := `*TV Shows Notification Bot Help*
 
 • Use the Search button to find shows
-• My Shows displays what you're following
+• My Shows displays what you'htmlRegexp following
 • Upcoming shows new episodes for your shows
 • You can also just type a show name to search for it
 

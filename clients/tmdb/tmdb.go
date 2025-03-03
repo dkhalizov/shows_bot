@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"shows/internal/models"
 	"strconv"
 	"time"
@@ -26,7 +27,8 @@ func NewClient(apiKey string) *Client {
 }
 
 func (c *Client) SearchShows(query string) ([]models.Show, error) {
-	url := fmt.Sprintf("%s/search/tv?api_key=%s&query=%s", c.baseURL, c.apiKey, query)
+	encodedQuery := url.QueryEscape(query)
+	url := fmt.Sprintf("%s/search/tv?api_key=%s&query=%s", c.baseURL, c.apiKey, encodedQuery)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -71,11 +73,20 @@ func (c *Client) SearchShows(query string) ([]models.Show, error) {
 		shows = append(shows, show)
 	}
 
+	for i, item := range result.Results {
+		if shows[i].IMDbID == "" {
+			details, err := c.GetShowDetails(strconv.Itoa(item.ID))
+			if err == nil && details.IMDbID != "" {
+				shows[i].IMDbID = details.IMDbID
+			}
+		}
+	}
+
 	return shows, nil
 }
 
 func (c *Client) GetShowDetails(id string) (*models.Show, error) {
-	url := fmt.Sprintf("%s/tv/%s?api_key=%s", c.baseURL, id, c.apiKey)
+	url := fmt.Sprintf("%s/tv/%s?append_to_response=external_ids&api_key=%s", c.baseURL, id, c.apiKey)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -91,6 +102,9 @@ func (c *Client) GetShowDetails(id string) (*models.Show, error) {
 		FirstAirDate string  `json:"first_air_date"`
 		Status       string  `json:"status"`
 		VoteAverage  float64 `json:"vote_average"`
+		ExternalIDs  struct {
+			IMDb string `json:"imdb_id"`
+		} `json:"external_ids"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -104,6 +118,7 @@ func (c *Client) GetShowDetails(id string) (*models.Show, error) {
 		Status:     result.Status,
 		Provider:   "tmdb",
 		ProviderID: strconv.Itoa(result.ID),
+		IMDbID:     result.ExternalIDs.IMDb,
 	}
 
 	if result.FirstAirDate != "" {

@@ -87,7 +87,7 @@ func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
 		b.editMessageWithMenu(
 			chatID,
 			messageID,
-			"📺 *My Shows*\n\nYou're not following any shows yet. Use the Search option to find shows to follow.",
+			"📺 *My Shows*\n\nYou'htmlRegexp not following any shows yet. Use the Search option to find shows to follow.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
 		return
