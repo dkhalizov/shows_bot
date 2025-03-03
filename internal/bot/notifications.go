@@ -2,16 +2,13 @@ package bot
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"shows/internal/models"
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 func (b *Bot) runNotificationChecker() {
-	log.Println("Starting notification checker...")
-
 	b.checkForNewEpisodes()
 
 	for range b.notifyTicker.C {
@@ -20,64 +17,77 @@ func (b *Bot) runNotificationChecker() {
 }
 
 func (b *Bot) checkForNewEpisodes() {
-	log.Println("Checking for new episodes...")
-
 	showIDs, err := b.dbManager.GetAllFollowedShows()
 	if err != nil {
-		log.Printf("Error querying followed shows: %v", err)
+		slog.Error("Error querying followed shows", "err", err)
+
 		return
 	}
+
+	slog.Debug("Checking for new episodes...", "showIDs", showIDs)
 
 	for _, showID := range showIDs {
 		show, err := b.dbManager.GetShow(showID)
 		if err != nil {
-			log.Printf("Error getting show %s: %v", showID, err)
+			slog.Error("Error querying show", "showID", showID, "err", err)
+
 			continue
 		}
 
-		client, ok := b.apiClients[show.Provider]
-		if !ok {
-			log.Printf("No API client found for provider %s", show.Provider)
-			continue
-		}
-
-		episodes, err := client.GetEpisodes(show.ProviderID)
-		if err != nil {
-			log.Printf("Error getting episodes for show %s: %v", show.Name, err)
-			continue
-		}
-
-		for _, episode := range episodes {
-
-			episode.ShowID = show.ID
-
-			now := time.Now()
-			thirtyDaysFromNow := now.AddDate(0, 0, 7)
-
-			if episode.AirDate.After(now) && episode.AirDate.Before(thirtyDaysFromNow) {
-
-				episodeID, err := b.dbManager.StoreEpisode(&episode)
-				if err != nil {
-					log.Printf("Error storing episode: %v", err)
-					continue
-				}
-
-				if episodeID != "" {
-					b.notifyUsersAboutEpisode(show, &episode)
-				}
-			}
+		if err = b.notifyUsersAboutShowEpisodes(show); err != nil {
+			slog.Error("Error notifying users about the show", "showID", showID, "err", err)
 		}
 	}
 }
 
-func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode) {
-	userIDs, err := b.dbManager.GetUsersToNotify(episode.ID, show.ID)
-	if err != nil {
-		log.Printf("Error getting users to notify: %v", err)
-		return
+func (b *Bot) notifyUsersAboutShowEpisodes(show *models.Show) error {
+	client, ok := b.apiClients[show.Provider]
+	if !ok {
+		return fmt.Errorf("apiClient for show %s :  %s not found", show.ID, show.Provider)
 	}
 
+	episodes, err := client.GetEpisodes(show.ProviderID)
+	if err != nil {
+		return fmt.Errorf("could not get episodes for show %s :  %w", show.ID, err)
+	}
+
+	slog.Debug("Got episodes", "showID", show.ID, "episodes", episodes)
+
+	for _, episode := range episodes {
+		episode.ShowID = show.ID
+		now := time.Now()
+		fromNow := now.Add(b.config.Bot.EpisodeNotificationThreshold)
+		shouldNotify := episode.AirDate.After(now) && episode.AirDate.Before(fromNow)
+
+		if shouldNotify {
+			episodeID, err := b.dbManager.StoreEpisode(&episode)
+			if err != nil {
+				slog.Error("Error storing episode", "episodeID", episodeID, "err", err)
+
+				continue
+			}
+
+			if err = b.notifyUsersAboutEpisode(show, &episode); err != nil {
+				slog.Error("Error notifying users about episode", "episodeID", episodeID, "err", err)
+
+				continue
+			}
+		}
+	}
+
+	return nil
+}
+
+func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode) error {
+	userIDs, err := b.dbManager.GetUsersToNotify(episode.ID, show.ID)
+	if err != nil {
+		return fmt.Errorf("could not get users to notify: %w", err)
+	}
+
+	slog.Debug("Got users to notify", "userIDs", userIDs)
+
 	for _, userID := range userIDs {
+		slog.Debug("Notifying user about episode", "userID", userID, "episodeID", episode.ID)
 		message := fmt.Sprintf("🔔 *New Episode Alert* 🔔\n\n*%s*\nSeason %d, Episode %d: %s\n\nAirs on %s",
 			show.Name,
 			episode.SeasonNumber,
@@ -91,21 +101,19 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 			if len(overview) > 150 {
 				overview = overview[:147] + "..."
 			}
+
 			message += fmt.Sprintf("\n\n%s", overview)
 		}
-		message = escapeMarkdown(message)
-		msg := tgbotapi.NewMessage(userID, message)
-		msg.ParseMode = "MarkdownV2"
-		_, err := b.api.Send(msg)
 
-		if err != nil {
-			log.Printf("Error sending notification to user %d: %v", userID, err)
-			continue
-		}
+		message = escapeMarkdown(message)
+
+		b.sendMessage(userID, message)
 
 		err = b.dbManager.RecordNotification(userID, episode.ID)
 		if err != nil {
-			log.Printf("Error recording notification: %v", err)
+			return fmt.Errorf("could not record notification for user %d: %w", userID, err)
 		}
 	}
+
+	return nil
 }

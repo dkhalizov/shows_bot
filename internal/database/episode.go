@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"shows/internal/models"
+
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
@@ -12,11 +13,11 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 	episode.ID = newID
 
 	insertQuery := `
-       INSERT INTO episodes (id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id)
+       INSERT INTO shows_bot.episodes (id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict do nothing
     `
 
-	_, err := m.db.Exec(
+	_, err := m.pool.Exec(
 		context.Background(),
 		insertQuery,
 		newID,
@@ -29,7 +30,6 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 		episode.Provider,
 		episode.ProviderID,
 	)
-
 	if err != nil {
 		return "", err
 	}
@@ -40,16 +40,17 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 func (m *Manager) GetNextEpisode(showID string) (*models.Episode, error) {
 	query := `
 		SELECT id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id
-		FROM episodes
+		FROM shows_bot.episodes
 		WHERE show_id = $1 AND air_date > NOW()
 		ORDER BY air_date
 		LIMIT 1
 	`
 
 	var episode models.Episode
+
 	var airDate sql.NullTime
 
-	err := m.db.QueryRow(context.Background(), query, showID).Scan(
+	err := m.pool.QueryRow(context.Background(), query, showID).Scan(
 		&episode.ID,
 		&episode.ShowID,
 		&episode.Name,
@@ -79,13 +80,13 @@ func (m *Manager) GetNextEpisode(showID string) (*models.Episode, error) {
 func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, error) {
 	query := `
 		SELECT e.id, e.show_id, e.name, e.season_number, e.episode_number, e.air_date, e.overview, e.provider, e.provider_id
-		FROM episodes e
-		JOIN user_shows us ON e.show_id = us.show_id
+		FROM shows_bot.episodes e
+		JOIN shows_bot.user_shows us ON e.show_id = us.show_id
 		WHERE us.user_id = $1 AND e.air_date > NOW() AND e.air_date < NOW() + INTERVAL '30 days'
 		ORDER BY e.air_date
 	`
 
-	rows, err := m.db.Query(context.Background(), query, userID)
+	rows, err := m.pool.Query(context.Background(), query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +96,7 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 
 	for rows.Next() {
 		var episode models.Episode
+
 		var airDate sql.NullTime
 
 		err := rows.Scan(
@@ -108,7 +110,6 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 			&episode.Provider,
 			&episode.ProviderID,
 		)
-
 		if err != nil {
 			return nil, err
 		}
@@ -130,12 +131,12 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 	query := `
 		SELECT id, show_id, name, season_number, episode_number, air_date, overview, provider, provider_id
-		FROM episodes
+		FROM shows_bot.episodes
 		WHERE show_id = $1
 		ORDER BY season_number, episode_number
 	`
 
-	rows, err := m.db.Query(context.Background(), query, showID)
+	rows, err := m.pool.Query(context.Background(), query, showID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +146,7 @@ func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 
 	for rows.Next() {
 		var episode models.Episode
+
 		var airDate sql.NullTime
 
 		err := rows.Scan(
@@ -158,7 +160,6 @@ func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 			&episode.Provider,
 			&episode.ProviderID,
 		)
-
 		if err != nil {
 			return nil, err
 		}

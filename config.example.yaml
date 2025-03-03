@@ -1,0 +1,61 @@
+# TV Shows Bot Configuration
+#
+# This is the main configuration file for the TV Shows Notification Bot
+# You can override these settings with environment variables
+
+# Core credentials (consider using environment variables for sensitive data)
+telegram_token: "" # Your Telegram Bot Token from BotFather
+database_url: "postgres://postgres:postgrespassword@localhost:5432/tv_shows?sslmode=disable" # PostgreSQL database URL
+
+# API keys for external services
+api_keys:
+  tmdb: "" # API key for The Movie Database
+
+# Bot-specific settings
+bot:
+  name: "TV Shows Notification Bot"
+  description: "Track your favorite TV shows and receive notifications about upcoming episodes"
+  notification_enabled: true
+  check_interval: 6h # How often to check for new episodes
+  max_results: 5 # Maximum number of search results to show
+  max_followed_shows: 100 # Maximum shows a user can follow
+  episode_notification_threshold: 24h # Notify users about episodes airing within this time
+
+# Logging configuration
+logging:
+  level: "debug" # Options: debug, info, warn, error
+  file: "" # Log to this file (empty for stdout only)
+  max_size: 100 # Maximum size in megabytes before rotating
+  max_backups: 3 # Number of rotated logs to keep
+  max_age: 28 # Maximum age in days to keep logs
+  compress: true # Compress rotated logs
+  json_format: true # Output logs in JSON format
+
+# Database-specific settings
+database:
+  max_connections: 10
+  max_idle_connections: 5
+  connection_lifetime: 5m
+  enable_prepared_statements: true
+  migration_directory: "migrations"
+  enable_automigrations: true
+
+# API client settings
+api_clients:
+  tmdb:
+    base_url: "https://api.themoviedb.org/3"
+    timeout: 10s
+    max_retries: 3
+    rate_limit: 40 # Requests per 10 seconds
+    use_poster_v2: false # Use newer poster endpoint
+  tvmaze:
+    base_url: "https://api.tvmaze.com"
+    timeout: 10s
+    max_retries: 3
+    rate_limit: 20 # Requests per 10 seconds
+
+development:
+  enabled: false
+  log_all_queries: false
+  mock_apis: false
+  debug_mode: false

@@ -1,0 +1,5 @@
+# Add to .gitignore
+config.yaml
+.env
+*.pem
+*.key

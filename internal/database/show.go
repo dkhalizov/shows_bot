@@ -4,17 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"shows/internal/models"
+
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 func (m *Manager) StoreShow(show *models.Show) (string, error) {
 	var existingID string
 
 	if show.IMDbID != "" {
-		query := `SELECT id FROM shows WHERE imdb_id = $1 AND imdb_id != ''`
-		err := m.db.QueryRow(context.Background(), query, show.IMDbID).Scan(&existingID)
-		if err == nil {
+		query := `SELECT id FROM shows_bot.shows WHERE imdb_id = $1 AND imdb_id != ''`
 
+		err := m.pool.QueryRow(context.Background(), query, show.IMDbID).Scan(&existingID)
+		if err == nil {
 			return existingID, nil
 		}
 	}
@@ -22,31 +23,31 @@ func (m *Manager) StoreShow(show *models.Show) (string, error) {
 	newID := fmt.Sprintf("%s_%s", show.Provider, show.ProviderID)
 
 	query := `
-        SELECT id FROM shows
+        SELECT id FROM shows_bot.shows
         WHERE provider = $1 AND provider_id = $2
     `
 
-	err := m.db.QueryRow(context.Background(), query, show.Provider, show.ProviderID).Scan(&existingID)
+	err := m.pool.QueryRow(context.Background(), query, show.Provider, show.ProviderID).Scan(&existingID)
 	if err == nil {
-
 		if show.IMDbID != "" {
 			updateQuery := `
-                UPDATE shows 
+                UPDATE shows_bot.shows 
                 SET imdb_id = $1 
                 WHERE id = $2 AND (imdb_id IS NULL OR imdb_id = '')
             `
-			_, _ = m.db.Exec(context.Background(), updateQuery, show.IMDbID, existingID)
+			_, _ = m.pool.Exec(context.Background(), updateQuery, show.IMDbID, existingID)
 		}
+
 		return existingID, nil
 	}
 
 	insertQuery := `
-        INSERT INTO shows (id, name, overview, poster_url, status, first_air_date, provider, provider_id, imdb_id)
+        INSERT INTO shows_bot.shows (id, name, overview, poster_url, status, first_air_date, provider, provider_id, imdb_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
     `
 
-	err = m.db.QueryRow(
+	err = m.pool.QueryRow(
 		context.Background(),
 		insertQuery,
 		newID,
@@ -59,7 +60,6 @@ func (m *Manager) StoreShow(show *models.Show) (string, error) {
 		show.ProviderID,
 		show.IMDbID,
 	).Scan(&newID)
-
 	if err != nil {
 		return "", err
 	}
@@ -70,14 +70,15 @@ func (m *Manager) StoreShow(show *models.Show) (string, error) {
 func (m *Manager) GetShow(showID string) (*models.Show, error) {
 	query := `
 		SELECT id, name, overview, poster_url, status, first_air_date, provider, provider_id, imdb_id
-		FROM shows
+		FROM shows_bot.shows
 		WHERE id = $1
 	`
 
 	var show models.Show
+
 	var firstAirDate sql.NullTime
 
-	err := m.db.QueryRow(context.Background(), query, showID).Scan(
+	err := m.pool.QueryRow(context.Background(), query, showID).Scan(
 		&show.ID,
 		&show.Name,
 		&show.Overview,
@@ -88,7 +89,6 @@ func (m *Manager) GetShow(showID string) (*models.Show, error) {
 		&show.ProviderID,
 		&show.IMDbID,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -102,45 +102,49 @@ func (m *Manager) GetShow(showID string) (*models.Show, error) {
 
 func (m *Manager) FollowShow(userID int, showID string) error {
 	query := `
-		INSERT INTO user_shows (user_id, show_id)
+		INSERT INTO shows_bot.user_shows (user_id, show_id)
 		VALUES ($1, $2)
 		ON CONFLICT (user_id, show_id) DO NOTHING
 	`
-	_, err := m.db.Exec(context.Background(), query, userID, showID)
+	_, err := m.pool.Exec(context.Background(), query, userID, showID)
+
 	return err
 }
 
 func (m *Manager) UnfollowShow(userID int, showID string) error {
 	query := `
-		DELETE FROM user_shows
+		DELETE FROM shows_bot.user_shows
 		WHERE user_id = $1 AND show_id = $2
 	`
-	_, err := m.db.Exec(context.Background(), query, userID, showID)
+	_, err := m.pool.Exec(context.Background(), query, userID, showID)
+
 	return err
 }
 
 func (m *Manager) IsUserFollowingShow(userID int, showID string) (bool, error) {
 	query := `
 		SELECT EXISTS(
-			SELECT 1 FROM user_shows
+			SELECT 1 FROM shows_bot.user_shows
 			WHERE user_id = $1 AND show_id = $2
 		)
 	`
+
 	var following bool
-	err := m.db.QueryRow(context.Background(), query, userID, showID).Scan(&following)
+	err := m.pool.QueryRow(context.Background(), query, userID, showID).Scan(&following)
+
 	return following, err
 }
 
 func (m *Manager) GetUserShows(userID int) ([]models.Show, error) {
 	query := `
 		SELECT s.id, s.name, s.overview, s.poster_url, s.status, s.first_air_date, s.provider, s.provider_id, s.imdb_id
-		FROM shows s
-		JOIN user_shows us ON s.id = us.show_id
+		FROM shows_bot.shows s
+		JOIN shows_bot.user_shows us ON s.id = us.show_id
 		WHERE us.user_id = $1
 		ORDER BY s.name
 	`
 
-	rows, err := m.db.Query(context.Background(), query, userID)
+	rows, err := m.pool.Query(context.Background(), query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +154,7 @@ func (m *Manager) GetUserShows(userID int) ([]models.Show, error) {
 
 	for rows.Next() {
 		var show models.Show
+
 		var firstAirDate sql.NullTime
 
 		err := rows.Scan(
@@ -163,7 +168,6 @@ func (m *Manager) GetUserShows(userID int) ([]models.Show, error) {
 			&show.ProviderID,
 			&show.IMDbID,
 		)
-
 		if err != nil {
 			return nil, err
 		}

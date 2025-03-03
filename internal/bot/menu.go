@@ -2,9 +2,11 @@ package bot
 
 import (
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
-	"shows/internal/models"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 const (
@@ -33,14 +35,6 @@ func (b *Bot) createMainMenu() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-func (b *Bot) createBackButton(target string) [][]tgbotapi.InlineKeyboardButton {
-	return [][]tgbotapi.InlineKeyboardButton{
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("◀️ Back", target),
-		),
-	}
-}
-
 func (b *Bot) createHomeButton() [][]tgbotapi.InlineKeyboardButton {
 	return [][]tgbotapi.InlineKeyboardButton{
 		tgbotapi.NewInlineKeyboardRow(
@@ -56,21 +50,13 @@ func (b *Bot) createBackHomeRow(backTarget string) []tgbotapi.InlineKeyboardButt
 	)
 }
 
-func (b *Bot) displayMainMenu(chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "📱 *Main Menu*\nSelect an option below:")
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = b.createMainMenu()
-	b.api.Send(msg)
-}
-
 func (b *Bot) editMessageWithMenu(chatID int64, messageID int, text string, markup tgbotapi.InlineKeyboardMarkup) {
 	msg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = &markup
-	b.api.Send(msg)
 }
 
-func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
+func (b *Bot) displayUserShows(chatID int64, messageID, userID int) {
 	shows, err := b.dbManager.GetUserShows(userID)
 	if err != nil {
 		b.editMessageWithMenu(
@@ -79,6 +65,7 @@ func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
 			"An error occurred while fetching your shows.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
+
 		return
 	}
 
@@ -89,14 +76,15 @@ func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
 			"📺 *My Shows*\n\nYou're not following any shows yet. Use the Search option to find shows to follow.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
+
 		return
 	}
 
 	text := "📺 *My Shows*\n\nYou are following these shows:"
+
 	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, show := range shows {
-
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				fmt.Sprintf("📋 %s", show.Name),
@@ -118,7 +106,6 @@ func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
 }
 
 func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, userID int) {
-
 	show, err := b.dbManager.GetShow(showID)
 	if err != nil {
 		b.editMessageWithMenu(
@@ -127,6 +114,7 @@ func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, use
 			"An error occurred while fetching show details.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
+
 		return
 	}
 
@@ -143,11 +131,11 @@ func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, use
 	details := fmt.Sprintf("🎬 *%s*\n\n", show.Name)
 
 	if show.Overview != "" {
-
 		overview := show.Overview
 		if len(overview) > 150 {
 			overview = overview[:147] + "..."
 		}
+
 		details += fmt.Sprintf("%s\n\n", overview)
 	}
 
@@ -166,12 +154,10 @@ func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, use
 	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 
 	if following {
-
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("❌ Unfollow", fmt.Sprintf("%s:%s", ActionUnfollow, show.ID)),
 		))
 	} else {
-
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Follow", fmt.Sprintf("%s:%s", ActionFollow, show.ID)),
 		))
@@ -190,8 +176,7 @@ func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, use
 	)
 }
 
-func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID int, userID int) {
-
+func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID, userID int) {
 	episodes, err := b.dbManager.GetUpcomingEpisodesForUser(userID)
 	if err != nil {
 		b.editMessageWithMenu(
@@ -200,6 +185,7 @@ func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID int, userID int) {
 			"An error occurred while fetching upcoming episodes.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
+
 		return
 	}
 
@@ -210,6 +196,7 @@ func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID int, userID int) {
 			"📅 *Upcoming Episodes*\n\nNo upcoming episodes for your followed shows.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
+
 		return
 	}
 
@@ -226,8 +213,10 @@ func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID int, userID int) {
 			show, err := b.dbManager.GetShow(episode.ShowID)
 			if err != nil {
 				log.Printf("Error getting show: %v", err)
+
 				continue
 			}
+
 			showNames[episode.ShowID] = show.Name
 			showIDs[show.Name] = show.ID
 		}
