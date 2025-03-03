@@ -87,36 +87,38 @@ func (b *Bot) handleListCommand(message *tgbotapi.Message) {
 	}
 
 	if len(shows) == 0 {
-		b.sendMessage(message.Chat.ID, "You'htmlRegexp not following any shows yet. Use /search to find shows to follow.")
+		b.sendMessage(message.Chat.ID, "You're not following any shows yet. Use /search to find shows to follow.")
 		return
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, "Your followed shows:")
+	text := "📺 My Shows\n\nYou are following these shows:"
+
+	for _, show := range shows {
+		text += fmt.Sprintf("\n\n• %s", show.Name)
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 
 	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, show := range shows {
-
-		msg.Text += fmt.Sprintf("\n\n• %s", show.Name)
-
-		unfollowButton := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("Unfollow %s", show.Name),
-			fmt.Sprintf("unfollow:%s", show.ID),
-		)
-
-		detailsButton := tgbotapi.NewInlineKeyboardButtonData(
-			"Details",
-			fmt.Sprintf("details:%s", show.ID),
-		)
-
-		inlineKeyboard = append(inlineKeyboard, []tgbotapi.InlineKeyboardButton{unfollowButton, detailsButton})
+		row := []tgbotapi.InlineKeyboardButton{
+			tgbotapi.NewInlineKeyboardButtonData(
+				"📋 Details",
+				fmt.Sprintf("details:%s", show.ID),
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				"❌ Unfollow",
+				fmt.Sprintf("unfollow:%s", show.ID),
+			),
+		}
+		inlineKeyboard = append(inlineKeyboard, row)
 	}
 
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
 
 	b.api.Send(msg)
 }
-
 func (b *Bot) handleUpcomingCommand(message *tgbotapi.Message) {
 	userID := message.From.ID
 

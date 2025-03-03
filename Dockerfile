@@ -21,6 +21,6 @@ EXPOSE 8080
 
 USER nonroot:nonroot
 
-LABEL org.opencontainers.image.source="https://github.com/deniskhalizov/shows-bot"
+LABEL org.opencontainers.image.source="https://github.com/deniskhalizov/shows_bot"
 LABEL org.opencontainers.image.description="Telegram bot for TV shows notifications"
 LABEL org.opencontainers.image.licenses="MIT"

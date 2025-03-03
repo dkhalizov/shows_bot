@@ -71,7 +71,6 @@ func (b *Bot) editMessageWithMenu(chatID int64, messageID int, text string, mark
 }
 
 func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
-
 	shows, err := b.dbManager.GetUserShows(userID)
 	if err != nil {
 		b.editMessageWithMenu(
@@ -87,22 +86,22 @@ func (b *Bot) displayUserShows(chatID int64, messageID int, userID int) {
 		b.editMessageWithMenu(
 			chatID,
 			messageID,
-			"📺 *My Shows*\n\nYou'htmlRegexp not following any shows yet. Use the Search option to find shows to follow.",
+			"📺 *My Shows*\n\nYou're not following any shows yet. Use the Search option to find shows to follow.",
 			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
 		)
 		return
 	}
 
 	text := "📺 *My Shows*\n\nYou are following these shows:"
-
 	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, show := range shows {
-		text += fmt.Sprintf("\n\n• *%s*", show.Name)
 
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📋 Details", fmt.Sprintf("%s:%s", ActionDetails, show.ID)),
-			tgbotapi.NewInlineKeyboardButtonData("❌ Unfollow", fmt.Sprintf("%s:%s", ActionUnfollow, show.ID)),
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("📋 %s", show.Name),
+				fmt.Sprintf("%s:%s", ActionDetails, show.ID),
+			),
 		))
 	}
 
