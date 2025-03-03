@@ -1,0 +1,183 @@
+package database
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"shows/internal/models"
+)
+
+func (m *Manager) StoreShow(show *models.Show) (string, error) {
+	var existingID string
+
+	if show.IMDbID != "" {
+		query := `SELECT id FROM shows WHERE imdb_id = $1 AND imdb_id != ''`
+		err := m.db.QueryRow(context.Background(), query, show.IMDbID).Scan(&existingID)
+		if err == nil {
+
+			return existingID, nil
+		}
+	}
+
+	newID := fmt.Sprintf("%s_%s", show.Provider, show.ProviderID)
+
+	query := `
+        SELECT id FROM shows
+        WHERE provider = $1 AND provider_id = $2
+    `
+
+	err := m.db.QueryRow(context.Background(), query, show.Provider, show.ProviderID).Scan(&existingID)
+	if err == nil {
+
+		if show.IMDbID != "" {
+			updateQuery := `
+                UPDATE shows 
+                SET imdb_id = $1 
+                WHERE id = $2 AND (imdb_id IS NULL OR imdb_id = '')
+            `
+			_, _ = m.db.Exec(context.Background(), updateQuery, show.IMDbID, existingID)
+		}
+		return existingID, nil
+	}
+
+	insertQuery := `
+        INSERT INTO shows (id, name, overview, poster_url, status, first_air_date, provider, provider_id, imdb_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id
+    `
+
+	err = m.db.QueryRow(
+		context.Background(),
+		insertQuery,
+		newID,
+		show.Name,
+		show.Overview,
+		show.PosterURL,
+		show.Status,
+		show.FirstAirDate,
+		show.Provider,
+		show.ProviderID,
+		show.IMDbID,
+	).Scan(&newID)
+
+	if err != nil {
+		return "", err
+	}
+
+	return newID, nil
+}
+
+func (m *Manager) GetShow(showID string) (*models.Show, error) {
+	query := `
+		SELECT id, name, overview, poster_url, status, first_air_date, provider, provider_id, imdb_id
+		FROM shows
+		WHERE id = $1
+	`
+
+	var show models.Show
+	var firstAirDate sql.NullTime
+
+	err := m.db.QueryRow(context.Background(), query, showID).Scan(
+		&show.ID,
+		&show.Name,
+		&show.Overview,
+		&show.PosterURL,
+		&show.Status,
+		&firstAirDate,
+		&show.Provider,
+		&show.ProviderID,
+		&show.IMDbID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if firstAirDate.Valid {
+		show.FirstAirDate = firstAirDate.Time
+	}
+
+	return &show, nil
+}
+
+func (m *Manager) FollowShow(userID int, showID string) error {
+	query := `
+		INSERT INTO user_shows (user_id, show_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, show_id) DO NOTHING
+	`
+	_, err := m.db.Exec(context.Background(), query, userID, showID)
+	return err
+}
+
+func (m *Manager) UnfollowShow(userID int, showID string) error {
+	query := `
+		DELETE FROM user_shows
+		WHERE user_id = $1 AND show_id = $2
+	`
+	_, err := m.db.Exec(context.Background(), query, userID, showID)
+	return err
+}
+
+func (m *Manager) IsUserFollowingShow(userID int, showID string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM user_shows
+			WHERE user_id = $1 AND show_id = $2
+		)
+	`
+	var following bool
+	err := m.db.QueryRow(context.Background(), query, userID, showID).Scan(&following)
+	return following, err
+}
+
+func (m *Manager) GetUserShows(userID int) ([]models.Show, error) {
+	query := `
+		SELECT s.id, s.name, s.overview, s.poster_url, s.status, s.first_air_date, s.provider, s.provider_id, s.imdb_id
+		FROM shows s
+		JOIN user_shows us ON s.id = us.show_id
+		WHERE us.user_id = $1
+		ORDER BY s.name
+	`
+
+	rows, err := m.db.Query(context.Background(), query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var shows []models.Show
+
+	for rows.Next() {
+		var show models.Show
+		var firstAirDate sql.NullTime
+
+		err := rows.Scan(
+			&show.ID,
+			&show.Name,
+			&show.Overview,
+			&show.PosterURL,
+			&show.Status,
+			&firstAirDate,
+			&show.Provider,
+			&show.ProviderID,
+			&show.IMDbID,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if firstAirDate.Valid {
+			show.FirstAirDate = firstAirDate.Time
+		}
+
+		shows = append(shows, show)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return shows, nil
+}
