@@ -44,7 +44,7 @@ func (m *Manager) InitDatabase() error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS episodes (
 			id TEXT PRIMARY KEY,
-			show_id TEXT NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
+			show_id TEXT NOT NULL REFERENCES shows_bot.shows(id) ON DELETE CASCADE,
 			name TEXT NOT NULL,
 			season_number INTEGER NOT NULL,
 			episode_number INTEGER NOT NULL,
@@ -56,15 +56,15 @@ func (m *Manager) InitDatabase() error {
 			UNIQUE (provider, provider_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS user_shows (
-			user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
-			show_id TEXT REFERENCES shows(id) ON DELETE CASCADE,
+			user_id BIGINT REFERENCES shows_bot.users(id) ON DELETE CASCADE,
+			show_id TEXT REFERENCES shows_bot.shows(id) ON DELETE CASCADE,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			PRIMARY KEY (user_id, show_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS notifications (
 			id SERIAL PRIMARY KEY,
-			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+			user_id BIGINT NOT NULL REFERENCES shows_bot.users(id) ON DELETE CASCADE,
+			episode_id TEXT NOT NULL REFERENCES shows_bot.episodes(id) ON DELETE CASCADE,
 			notified_at TIMESTAMP,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			UNIQUE (user_id, episode_id)
@@ -83,7 +83,7 @@ func (m *Manager) InitDatabase() error {
 
 func (m *Manager) StoreUser(tgUser *tgbotapi.User) error {
 	query := `
-		INSERT INTO users (id, username, first_name, last_name)
+		INSERT INTO shows_bot.users (id, username, first_name, last_name)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id) DO UPDATE
 		SET username = $2, first_name = $3, last_name = $4
@@ -101,7 +101,7 @@ func (m *Manager) StoreUser(tgUser *tgbotapi.User) error {
 
 func (m *Manager) GetAllFollowedShows() ([]string, error) {
 	query := `
-		SELECT DISTINCT show_id FROM user_shows
+		SELECT DISTINCT show_id FROM shows_bot.user_shows
 	`
 
 	rows, err := m.db.Query(context.Background(), query)
@@ -130,9 +130,9 @@ func (m *Manager) GetAllFollowedShows() ([]string, error) {
 func (m *Manager) GetUsersToNotify(episodeID string, showID string) ([]int64, error) {
 	query := `
 		SELECT u.id
-		FROM users u
-		JOIN user_shows us ON u.id = us.user_id
-		LEFT JOIN notifications n ON u.id = n.user_id AND n.episode_id = $1
+		FROM shows_bot.users u
+		JOIN shows_bot.user_shows us ON u.id = us.user_id
+		LEFT JOIN shows_bot.notifications n ON u.id = n.user_id AND n.episode_id = $1
 		WHERE us.show_id = $2 AND n.id IS NULL
 	`
 
@@ -161,7 +161,7 @@ func (m *Manager) GetUsersToNotify(episodeID string, showID string) ([]int64, er
 
 func (m *Manager) RecordNotification(userID int64, episodeID string) error {
 	query := `
-		INSERT INTO notifications (user_id, episode_id, notified_at) 
+		INSERT INTO shows_bot.notifications (user_id, episode_id, notified_at) 
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (user_id, episode_id) DO NOTHING
 	`
@@ -172,7 +172,7 @@ func (m *Manager) RecordNotification(userID int64, episodeID string) error {
 func (m *Manager) IsShowFollowed(userID int64, showID string) (bool, error) {
 	query := `
 		SELECT EXISTS (
-			SELECT 1 FROM user_shows WHERE user_id = $1 AND show_id = $2
+			SELECT 1 FROM shows_bot.user_shows WHERE user_id = $1 AND show_id = $2
 		)
 	`
 
