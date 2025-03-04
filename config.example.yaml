@@ -5,7 +5,6 @@
 
 # Core credentials (consider using environment variables for sensitive data)
 telegram_token: "" # Your Telegram Bot Token from BotFather
-database_url: "postgres://postgres:postgrespassword@localhost:5432/tv_shows?sslmode=disable" # PostgreSQL database URL
 
 # API keys for external services
 api_keys:
@@ -13,8 +12,6 @@ api_keys:
 
 # Bot-specific settings
 bot:
-  name: "TV Shows Notification Bot"
-  description: "Track your favorite TV shows and receive notifications about upcoming episodes"
   notification_enabled: true
   check_interval: 6h # How often to check for new episodes
   max_results: 5 # Maximum number of search results to show
@@ -33,10 +30,12 @@ logging:
 
 # Database-specific settings
 database:
+  database_url: "postgres://postgres:postgrespassword@localhost:5432/tv_shows?sslmode=disable" # PostgreSQL database URL
   max_connections: 10
   max_idle_connections: 5
   connection_lifetime: 5m
   enable_prepared_statements: true
+  log_all_queries: false
 
 # API client settings
 api_clients:
@@ -54,6 +53,5 @@ api_clients:
 
 development:
   enabled: false
-  log_all_queries: false
   mock_apis: false
   debug_mode: false

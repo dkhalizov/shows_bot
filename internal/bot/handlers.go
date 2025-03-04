@@ -172,6 +172,8 @@ func (b *Bot) handleCallbackQuery(callbackQuery *tgbotapi.CallbackQuery) {
 	userID := callbackQuery.From.ID
 	chatID := callbackQuery.Message.Chat.ID
 
+	slog.Debug("handleCallbackQuery", "data", data, "userID", userID)
+
 	switch data {
 	case MenuMain:
 		b.editMessageWithMenu(

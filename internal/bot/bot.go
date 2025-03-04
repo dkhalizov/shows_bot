@@ -132,7 +132,9 @@ func (b *Bot) processUpdate(update tgbotapi.Update) {
 }
 
 func (b *Bot) sendMessage(chatID int64, text string) {
+	text = escapeMarkdown(text)
 	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "MarkdownV2"
 
 	_, err := b.api.Send(msg)
 	if err != nil {
@@ -141,8 +143,10 @@ func (b *Bot) sendMessage(chatID int64, text string) {
 }
 
 func (b *Bot) sendMessageWithMarkup(chatID int64, text string, ikm tgbotapi.InlineKeyboardMarkup) {
+	text = escapeMarkdown(text)
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = ikm
+	msg.ParseMode = "MarkdownV2"
 
 	_, err := b.api.Send(msg)
 	if err != nil {

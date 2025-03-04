@@ -100,9 +100,7 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 		tgbotapi.NewInlineKeyboardButtonData("🔍 New Search", MenuSearch),
 	))
 
-	escapedText := escapeMarkdown(text)
-
-	b.sendMessageWithMarkup(chatID, escapedText, tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...))
+	b.sendMessageWithMarkup(chatID, text, tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...))
 }
 
 func stripHTMLTags(s string) string {

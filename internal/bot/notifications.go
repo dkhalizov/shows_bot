@@ -105,8 +105,6 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 			message += fmt.Sprintf("\n\n%s", overview)
 		}
 
-		message = escapeMarkdown(message)
-
 		b.sendMessage(userID, message)
 
 		err = b.dbManager.RecordNotification(userID, episode.ID)

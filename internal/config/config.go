@@ -29,8 +29,6 @@ type Server struct {
 }
 
 type Bot struct {
-	Name                         string        `yaml:"name"`
-	Description                  string        `yaml:"description"`
 	NotificationEnabled          bool          `yaml:"notification_enabled"`
 	CheckInterval                time.Duration `yaml:"check_interval"`
 	MaxResults                   int           `yaml:"max_results"`
@@ -90,8 +88,6 @@ func DefaultConfig() Config {
 		APIKeys: make(map[string]string),
 	}
 
-	cfg.Bot.Name = "TV Shows Bot"
-	cfg.Bot.Description = "Track your favorite TV shows and get episode notifications"
 	cfg.Bot.NotificationEnabled = true
 	cfg.Bot.CheckInterval = 6 * time.Hour
 	cfg.Bot.MaxResults = 5
@@ -103,28 +99,21 @@ func DefaultConfig() Config {
 	cfg.Logging.MaxBackups = 3
 	cfg.Logging.MaxAge = 28
 	cfg.Logging.Compress = true
-	cfg.Logging.JSON = false
 
 	cfg.Database.MaxConnections = 10
 	cfg.Database.MaxIdleConnections = 5
 	cfg.Database.ConnectionLifetime = 5 * time.Minute
 	cfg.Database.StatementCacheSize = 100
-	cfg.Database.EnablePreparedStmts = true
 
 	cfg.APIClients.TMDB.BaseURL = "https://api.themoviedb.org/3"
 	cfg.APIClients.TMDB.Timeout = 10 * time.Second
 	cfg.APIClients.TMDB.MaxRetries = 3
 	cfg.APIClients.TMDB.RateLimit = 40
-	cfg.APIClients.TMDB.UsePosterV2 = false
 
 	cfg.APIClients.TVMaze.BaseURL = "https://api.tvmaze.com"
 	cfg.APIClients.TVMaze.Timeout = 10 * time.Second
 	cfg.APIClients.TVMaze.MaxRetries = 3
 	cfg.APIClients.TVMaze.RateLimit = 20
-
-	cfg.Development.Enabled = false
-	cfg.Development.MockAPIs = false
-	cfg.Development.DebugMode = false
 
 	return cfg
 }

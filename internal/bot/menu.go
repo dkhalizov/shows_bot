@@ -3,6 +3,7 @@ package bot
 import (
 	"fmt"
 	"log"
+	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 
@@ -51,9 +52,15 @@ func (b *Bot) createBackHomeRow(backTarget string) []tgbotapi.InlineKeyboardButt
 }
 
 func (b *Bot) editMessageWithMenu(chatID int64, messageID int, text string, markup tgbotapi.InlineKeyboardMarkup) {
+	text = escapeMarkdown(text)
 	msg := tgbotapi.NewEditMessageText(chatID, messageID, text)
-	msg.ParseMode = "Markdown"
+	msg.ParseMode = "MarkdownV2"
 	msg.ReplyMarkup = &markup
+
+	_, err := b.api.Send(msg)
+	if err != nil {
+		slog.Error("failed to edit message", "err", err)
+	}
 }
 
 func (b *Bot) displayUserShows(chatID int64, messageID, userID int) {
