@@ -39,13 +39,13 @@ type Bot struct {
 }
 
 type Database struct {
-	MaxConnections       int32         `yaml:"max_connections"`
-	MaxIdleConnections   int32         `yaml:"max_idle_connections"`
-	ConnectionLifetime   time.Duration `yaml:"connection_lifetime"`
-	StatementCacheSize   int           `yaml:"statement_cache_size"`
-	EnablePreparedStmts  bool          `yaml:"enable_prepared_statements"`
-	MigrationDirectory   string        `yaml:"migration_directory"`
-	EnableAutomigrations bool          `yaml:"enable_automigrations"`
+	Type                string        `yaml:"type"`
+	DatabaseURL         string        `yaml:"database_url"`
+	MaxConnections      int32         `yaml:"max_connections"`
+	MaxIdleConnections  int32         `yaml:"max_idle_connections"`
+	ConnectionLifetime  time.Duration `yaml:"connection_lifetime"`
+	StatementCacheSize  int           `yaml:"statement_cache_size"`
+	EnablePreparedStmts bool          `yaml:"enable_prepared_statements"`
 }
 
 type APIClients struct {
@@ -73,7 +73,6 @@ type Development struct {
 
 type Config struct {
 	TelegramToken string            `yaml:"telegram_token"`
-	DatabaseURL   string            `yaml:"database_url"`
 	APIKeys       map[string]string `yaml:"api_keys"`
 
 	Bot Bot `yaml:"bot"`
@@ -111,8 +110,6 @@ func DefaultConfig() Config {
 	cfg.Database.ConnectionLifetime = 5 * time.Minute
 	cfg.Database.StatementCacheSize = 100
 	cfg.Database.EnablePreparedStmts = true
-	cfg.Database.MigrationDirectory = "migrations"
-	cfg.Database.EnableAutomigrations = true
 
 	cfg.APIClients.TMDB.BaseURL = "https://api.themoviedb.org/3"
 	cfg.APIClients.TMDB.Timeout = 10 * time.Second
@@ -201,7 +198,7 @@ func (c *Config) loadFromEnv() {
 	}
 
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
-		c.DatabaseURL = dbURL
+		c.Database.DatabaseURL = dbURL
 	}
 
 	if tmdbKey := os.Getenv("TMDB_API_KEY"); tmdbKey != "" {
@@ -236,7 +233,7 @@ func (c *Config) validate() error {
 		return errors.New("telegram token is required")
 	}
 
-	if c.DatabaseURL == "" {
+	if c.Database.DatabaseURL == "" {
 		return errors.New("database URL is required")
 	}
 

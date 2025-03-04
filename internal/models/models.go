@@ -1,9 +1,12 @@
 package models
 
 import (
+	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"time"
 )
 
+type User *tgbotapi.User
 type Show struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
@@ -17,6 +20,10 @@ type Show struct {
 	IMDbID       string    `json:"imdb_id"`
 }
 
+func (show Show) GenerateID() string {
+	return fmt.Sprintf("%s_%s", show.Provider, show.ProviderID)
+}
+
 type Episode struct {
 	ID            string    `json:"id"`
 	ShowID        string    `json:"show_id"`
@@ -27,11 +34,4 @@ type Episode struct {
 	Overview      string    `json:"overview"`
 	Provider      string    `json:"provider"`
 	ProviderID    string    `json:"provider_id"`
-}
-
-type User struct {
-	ID        int64  `json:"id"`
-	Username  string `json:"username"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
 }

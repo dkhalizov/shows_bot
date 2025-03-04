@@ -6,14 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/dkhalizov/shows/internal/database/pgsql"
+	"github.com/dkhalizov/shows/internal/database/sqlite"
 
 	"github.com/dkhalizov/shows/clients"
 	"github.com/dkhalizov/shows/clients/tmdb"
 	"github.com/dkhalizov/shows/clients/tvmaze"
 	"github.com/dkhalizov/shows/internal/config"
 	"github.com/dkhalizov/shows/internal/database"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 type Bot struct {
@@ -21,7 +22,7 @@ type Bot struct {
 	apiClients    map[string]clients.ShowAPIClient
 	notifyTicker  *time.Ticker
 	checkInterval time.Duration
-	dbManager     *database.Manager
+	dbManager     database.Operations
 	config        config.Config
 }
 
@@ -35,26 +36,42 @@ func New(config config.Config) (*Bot, error) {
 
 	bot.Debug = config.Development.DebugMode
 
-	dbConfig, err := pgxpool.ParseConfig(config.DatabaseURL)
+	dbManager, err := makeDBManager(config.Database)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+		return nil, fmt.Errorf("failed to initialize database manager: %w", err)
 	}
 
-	dbConfig.MaxConns = config.Database.MaxConnections
-	dbConfig.MaxConnIdleTime = config.Database.ConnectionLifetime
-	dbConfig.MaxConnLifetime = config.Database.ConnectionLifetime * 2
+	apiClients := makeAPIClients(config)
 
-	if !config.Database.EnablePreparedStmts {
-		dbConfig.ConnConfig.PreferSimpleProtocol = true
+	return &Bot{
+		api:           bot,
+		dbManager:     dbManager,
+		apiClients:    apiClients,
+		notifyTicker:  time.NewTicker(config.Bot.CheckInterval),
+		checkInterval: config.Bot.CheckInterval,
+		config:        config,
+	}, nil
+}
+
+func makeDBManager(config config.Database) (database.Operations, error) {
+	var dbManager database.Operations
+
+	var err error
+	switch config.Type {
+	case "postgres":
+		dbManager, err = pgsql.MakeManager(config)
+	case "sqlite":
+		dbManager, err = sqlite.MakeManager(config)
 	}
 
-	pool, err := database.ConfigureConnectionPool(config.DatabaseURL, config.Database)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool to database: %w", err)
+		return nil, fmt.Errorf("failed to initialize database manager: %w", err)
 	}
 
-	dbManager := database.NewManagerWithConfig(pool, config.Database)
+	return dbManager, nil
+}
 
+func makeAPIClients(config config.Config) map[string]clients.ShowAPIClient {
 	apiClients := make(map[string]clients.ShowAPIClient)
 
 	if tmdbKey, ok := config.APIKeys["tmdb"]; ok {
@@ -72,20 +89,13 @@ func New(config config.Config) (*Bot, error) {
 
 	apiClients["tvmaze"] = tvmazeClient
 
-	return &Bot{
-		api:           bot,
-		dbManager:     dbManager,
-		apiClients:    apiClients,
-		notifyTicker:  time.NewTicker(config.Bot.CheckInterval),
-		checkInterval: config.Bot.CheckInterval,
-		config:        config,
-	}, nil
+	return apiClients
 }
 
 func (b *Bot) Start() error {
 	slog.Info("Starting Telegram Bot")
 
-	if err := b.dbManager.InitDatabase(); err != nil {
+	if err := b.dbManager.Init(); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 

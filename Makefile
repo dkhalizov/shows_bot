@@ -6,7 +6,6 @@ BUILD_DIR := ./bin
 CONFIG_FILE := config.yaml
 DOCKER_COMPOSE_FILE := docker-compose.yml
 TEST_COVERAGE_PROFILE := coverage.out
-MIGRATION_DIR := ./migrations
 
 GO_TOOLS := golangci-lint mockgen godoc gopls goimports staticcheck dlv govulncheck
 
@@ -30,7 +29,6 @@ help:
 	@echo "  test-coverage Run tests with coverage"
 	@echo "  lint          Run linter"
 	@echo "  docker-build  Build Docker image"
-	@echo "  migrate       Run database migrations"
 	@echo "  clean         Clean build artifacts"
 	@echo "  mock-apis     Generate mock API clients for testing"
 	@echo "  setup-env     Setup local development environment"
@@ -93,13 +91,6 @@ docker-build:
 	@echo "Building Docker image $(DOCKER_REPO):$(VERSION)..."
 	@docker build $(DOCKER_BUILD_ARGS) -t $(DOCKER_REPO):$(VERSION) -t $(DOCKER_REPO):latest .
 
-
-.PHONY: migrate
-migrate:
-	@echo "Running database migrations..."
-	@go run cmd/migrations/main.go --dir=$(MIGRATION_DIR) --dsn="${DATABASE_URL}"
-
-
 .PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
@@ -123,16 +114,6 @@ setup-env:
 	@go mod tidy
 	@cp -n config.example.yaml $(CONFIG_FILE) || true
 	@echo "Development environment setup complete!"
-
-
-.PHONY: new-migration
-new-migration:
-	@read -p "Enter migration name: " name; \
-	timestamp=$$(date +%Y%m%d%H%M%S); \
-	mkdir -p $(MIGRATION_DIR); \
-	touch $(MIGRATION_DIR)/$${timestamp}_$${name}.sql; \
-	echo "Created migration file: $(MIGRATION_DIR)/$${timestamp}_$${name}.sql"
-
 
 .PHONY: build-all
 build-all:

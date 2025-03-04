@@ -1,10 +1,8 @@
-package database
+package pgsql
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
-
 	"github.com/dkhalizov/shows/internal/models"
 )
 
@@ -20,7 +18,7 @@ func (m *Manager) StoreShow(show *models.Show) (string, error) {
 		}
 	}
 
-	newID := fmt.Sprintf("%s_%s", show.Provider, show.ProviderID)
+	newID := show.GenerateID()
 
 	query := `
         SELECT id FROM shows_bot.shows
@@ -184,4 +182,19 @@ func (m *Manager) GetUserShows(userID int) ([]models.Show, error) {
 	}
 
 	return shows, nil
+}
+
+func (m *Manager) IsShowFollowed(userID int64, showID string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1 FROM shows_bot.user_shows WHERE user_id = $1 AND show_id = $2
+		)
+	`
+
+	var followed bool
+	if err := m.pool.QueryRow(context.Background(), query, userID, showID).Scan(&followed); err != nil {
+		return false, err
+	}
+
+	return followed, nil
 }

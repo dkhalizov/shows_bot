@@ -37,8 +37,6 @@ database:
   max_idle_connections: 5
   connection_lifetime: 5m
   enable_prepared_statements: true
-  migration_directory: "migrations"
-  enable_automigrations: true
 
 # API client settings
 api_clients:

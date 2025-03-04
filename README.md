@@ -201,7 +201,6 @@ See the [full configuration guide](docs/configuration.md) for more details.
 │   ├── config         # Configuration handling
 │   ├── database       # Database operations
 │   └── models         # Data models
-├── migrations         # Database migrations
 ├── Dockerfile         # Docker build instructions
 ├── docker-compose.yml # Local development setup
 ├── go.mod             # Go module definition

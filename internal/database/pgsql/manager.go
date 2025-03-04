@@ -1,4 +1,4 @@
-package database
+package pgsql
 
 import (
 	"context"
@@ -16,50 +16,18 @@ type Manager struct {
 	config config.Database
 }
 
-func NewManagerWithConfig(pool *pgxpool.Pool, config config.Database) *Manager {
-	return &Manager{
-		pool:   pool,
-		config: config,
-	}
-}
-
-func ConfigurePool(poolConfig *pgxpool.Config, dbConfig config.Database) {
+func configurePool(poolConfig *pgxpool.Config, dbConfig config.Database) {
 	if !dbConfig.EnablePreparedStmts {
 		poolConfig.ConnConfig.PreferSimpleProtocol = true
 	}
 }
 
-func (m *Manager) InitDatabase() error {
+func (m *Manager) Init() error {
 	ctx := context.Background()
 
 	if err := m.pool.Ping(ctx); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
-
-	if m.config.EnableAutomigrations {
-		if err := m.runMigrations(); err != nil {
-			return fmt.Errorf("failed to run migrations: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (m *Manager) runMigrations() error {
-	migrationDir := m.config.MigrationDirectory
-	if migrationDir == "" {
-		migrationDir = "migrations"
-	}
-
-	slog.Info("Running database migrations from directory", "dir", migrationDir)
-
-	files, err := filepath.Glob(filepath.Join(migrationDir, "*.sql"))
-	if err != nil {
-		return fmt.Errorf("failed to find migration files: %w", err)
-	}
-	// TODO: Implement the rest of the function
-
-	slog.Info("Found migration files", "count", len(files))
 
 	return nil
 }
@@ -70,7 +38,7 @@ func ConfigureConnectionPool(dbURL string, config config.Database) (*pgxpool.Poo
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	ConfigurePool(poolConfig, config)
+	configurePool(poolConfig, config)
 
 	if config.MaxConnections > 0 {
 		poolConfig.MaxConns = config.MaxConnections
@@ -87,4 +55,31 @@ func ConfigureConnectionPool(dbURL string, config config.Database) (*pgxpool.Poo
 	}
 
 	return pool, nil
+}
+
+func MakeManager(config config.Database) (*Manager, error) {
+	dbConfig, err := pgxpool.ParseConfig(config.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+	}
+
+	dbConfig.MaxConns = config.MaxConnections
+	dbConfig.MaxConnIdleTime = config.ConnectionLifetime
+	dbConfig.MaxConnLifetime = config.ConnectionLifetime * 2
+
+	if !config.EnablePreparedStmts {
+		dbConfig.ConnConfig.PreferSimpleProtocol = true
+	}
+
+	pool, err := ConfigureConnectionPool(dbConfig.ConnString(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool to database: %w", err)
+	}
+
+	dbManager := &Manager{
+		pool:   pool,
+		config: config,
+	}
+
+	return dbManager, nil
 }
