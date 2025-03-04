@@ -24,7 +24,7 @@ A Telegram bot that helps users track their favorite TV shows and receive notifi
 ## 🛠️ Tech Stack
 
 - **Language**: Go (v1.24)
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (production) / SQLite (development)
 - **APIs**:
   - [TMDB (The Movie Database) API](https://developers.themoviedb.org/3)
   - [TVMaze API](https://www.tvmaze.com/api)
@@ -37,7 +37,7 @@ A Telegram bot that helps users track their favorite TV shows and receive notifi
 ### Prerequisites
 
 - Go 1.24 or higher
-- PostgreSQL database
+- Database (PostgreSQL for production, SQLite for development)
 - Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
 - TMDB API Key (optional, but recommended)
 
@@ -76,6 +76,29 @@ The following environment variables need to be set:
 TELEGRAM_TOKEN=your_telegram_bot_token
 DATABASE_URL=postgres://username:password@hostname:port/database
 TMDB_API_KEY=your_tmdb_api_key  # Optional
+```
+
+### Database Options
+
+The bot supports multiple database backends:
+
+#### PostgreSQL (Recommended for Production)
+
+```env
+DATABASE_URL=postgres://username:password@hostname:port/database?sslmode=disable
+```
+
+#### SQLite (Great for Development or Single-user Deployment)
+
+```env
+DATABASE_URL=sqlite://./data/shows.db
+# or
+DATABASE_URL=file:./data/shows.db
+```
+
+To use an in-memory SQLite database for testing:
+```env
+DATABASE_URL=:memory:
 ```
 
 ### Running Locally
@@ -184,6 +207,34 @@ bot:
   episode_notification_threshold: 24h
 ```
 
+### Database Configuration
+
+You can customize your database settings:
+
+```yaml
+# Database-specific settings
+database:
+  database_url: "${DATABASE_URL}"  # PostgreSQL or SQLite connection string
+  max_connections: 10              # Maximum number of open connections
+  max_idle_connections: 5          # Maximum number of idle connections
+  connection_lifetime: 5m          # Maximum lifetime of a connection
+  enable_prepared_statements: true # Use prepared statements for performance
+  log_all_queries: false           # Log SQL queries (development only)
+```
+
+### SQLite-specific Settings
+
+When using SQLite, you can add the following settings:
+
+```yaml
+database:
+  database_url: "sqlite://./data/shows.db"
+  journal_mode: "WAL"       # Use Write-Ahead Logging for better concurrency
+  busy_timeout: 5000        # Milliseconds to wait for lock to clear
+  foreign_keys: true        # Enable foreign key constraints
+  cache_size: -2000         # Negative values are in kibibytes
+```
+
 See the [full configuration guide](docs/configuration.md) for more details.
 
 ## 📂 Project Structure
@@ -218,13 +269,15 @@ The clients implement a common interface (`ShowAPIClient`), making it easy to ad
 
 ## 🗄️ Database Schema
 
-The application uses PostgreSQL with the following tables:
+The application uses the following tables:
 
 - `users`: Stores Telegram user information
 - `shows`: Contains TV show details
 - `episodes`: Stores episode information
 - `user_shows`: Tracks which users follow which shows
 - `notifications`: Records which notifications have been sent
+
+Schema migrations are handled automatically on startup. When switching between database types, the application will create the necessary tables.
 
 ## 🤝 Contributing
 
