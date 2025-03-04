@@ -1,4 +1,4 @@
-package database
+package bot
 
 import (
 	"github.com/dkhalizov/shows/internal/models"

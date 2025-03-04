@@ -6,8 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dkhalizov/shows/internal/database/pgsql"
-	"github.com/dkhalizov/shows/internal/database/sqlite"
+	"github.com/dkhalizov/shows/internal/models"
 
 	"github.com/dkhalizov/shows/clients"
 	"github.com/dkhalizov/shows/clients/tmdb"
@@ -22,7 +21,7 @@ type Bot struct {
 	apiClients    map[string]clients.ShowAPIClient
 	notifyTicker  *time.Ticker
 	checkInterval time.Duration
-	dbManager     database.Operations
+	dbManager     Operations
 	config        config.Config
 }
 
@@ -36,7 +35,7 @@ func New(config config.Config) (*Bot, error) {
 
 	bot.Debug = config.Development.DebugMode
 
-	dbManager, err := makeDBManager(config.Database)
+	dbManager, err := database.NewManager(config.Database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database manager: %w", err)
 	}
@@ -51,24 +50,6 @@ func New(config config.Config) (*Bot, error) {
 		checkInterval: config.Bot.CheckInterval,
 		config:        config,
 	}, nil
-}
-
-func makeDBManager(config config.Database) (database.Operations, error) {
-	var dbManager database.Operations
-
-	var err error
-	switch config.Type {
-	case "postgres":
-		dbManager, err = pgsql.MakeManager(config)
-	case "sqlite":
-		dbManager, err = sqlite.MakeManager(config)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database manager: %w", err)
-	}
-
-	return dbManager, nil
 }
 
 func makeAPIClients(config config.Config) map[string]clients.ShowAPIClient {
@@ -137,7 +118,7 @@ func (b *Bot) processUpdate(update tgbotapi.Update) {
 		return
 	}
 
-	if err := b.dbManager.StoreUser(update.Message.From); err != nil {
+	if err := b.dbManager.StoreUser(models.FromTelegramUser(update.Message.From)); err != nil {
 		slog.Error("failed storing user", "err", err)
 	}
 

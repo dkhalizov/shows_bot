@@ -46,6 +46,7 @@ type Database struct {
 	ConnectionLifetime  time.Duration `yaml:"connection_lifetime"`
 	StatementCacheSize  int           `yaml:"statement_cache_size"`
 	EnablePreparedStmts bool          `yaml:"enable_prepared_statements"`
+	LogAllQueries       bool          `yaml:"log_all_queries"`
 }
 
 type APIClients struct {
@@ -65,10 +66,9 @@ type APIClients struct {
 }
 
 type Development struct {
-	Enabled       bool `yaml:"enabled"`
-	LogAllQueries bool `yaml:"log_all_queries"`
-	MockAPIs      bool `yaml:"mock_apis"`
-	DebugMode     bool `yaml:"debug_mode"`
+	Enabled   bool `yaml:"enabled"`
+	MockAPIs  bool `yaml:"mock_apis"`
+	DebugMode bool `yaml:"debug_mode"`
 }
 
 type Config struct {
@@ -123,7 +123,6 @@ func DefaultConfig() Config {
 	cfg.APIClients.TVMaze.RateLimit = 20
 
 	cfg.Development.Enabled = false
-	cfg.Development.LogAllQueries = false
 	cfg.Development.MockAPIs = false
 	cfg.Development.DebugMode = false
 
