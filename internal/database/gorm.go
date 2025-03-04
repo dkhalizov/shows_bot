@@ -72,6 +72,8 @@ func NewManager(config config.Database) (*Manager, error) {
 func (m *Manager) Init() error {
 	if strings.HasPrefix(m.config.DatabaseURL, "postgres") {
 		m.db.Exec("CREATE SCHEMA IF NOT EXISTS shows_bot")
+		//set schema
+		m.db.Exec("SET search_path TO shows_bot")
 	}
 
 	slog.Debug("Running database migrations...")
