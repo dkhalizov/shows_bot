@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"shows/internal/models"
+
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
@@ -16,7 +17,7 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict do nothing
     `
 
-	_, err := m.db.Exec(
+	_, err := m.pool.Exec(
 		context.Background(),
 		insertQuery,
 		newID,
@@ -29,7 +30,6 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 		episode.Provider,
 		episode.ProviderID,
 	)
-
 	if err != nil {
 		return "", err
 	}
@@ -47,9 +47,10 @@ func (m *Manager) GetNextEpisode(showID string) (*models.Episode, error) {
 	`
 
 	var episode models.Episode
+
 	var airDate sql.NullTime
 
-	err := m.db.QueryRow(context.Background(), query, showID).Scan(
+	err := m.pool.QueryRow(context.Background(), query, showID).Scan(
 		&episode.ID,
 		&episode.ShowID,
 		&episode.Name,
@@ -85,7 +86,7 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 		ORDER BY e.air_date
 	`
 
-	rows, err := m.db.Query(context.Background(), query, userID)
+	rows, err := m.pool.Query(context.Background(), query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +96,7 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 
 	for rows.Next() {
 		var episode models.Episode
+
 		var airDate sql.NullTime
 
 		err := rows.Scan(
@@ -108,7 +110,6 @@ func (m *Manager) GetUpcomingEpisodesForUser(userID int) ([]models.Episode, erro
 			&episode.Provider,
 			&episode.ProviderID,
 		)
-
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +136,7 @@ func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 		ORDER BY season_number, episode_number
 	`
 
-	rows, err := m.db.Query(context.Background(), query, showID)
+	rows, err := m.pool.Query(context.Background(), query, showID)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +146,7 @@ func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 
 	for rows.Next() {
 		var episode models.Episode
+
 		var airDate sql.NullTime
 
 		err := rows.Scan(
@@ -158,7 +160,6 @@ func (m *Manager) GetEpisodesForShow(showID string) ([]models.Episode, error) {
 			&episode.Provider,
 			&episode.ProviderID,
 		)
-
 		if err != nil {
 			return nil, err
 		}

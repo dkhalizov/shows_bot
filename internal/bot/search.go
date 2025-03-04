@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"shows/internal/models"
+
+	"github.com/dkhalizov/shows/internal/models"
 )
 
 var htmlRegexp = regexp.MustCompile(`<[^>]*>`)
@@ -22,9 +23,7 @@ type SearchSession struct {
 
 func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.Show) {
 	if len(results) == 0 {
-		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("No shows found for: %s", query))
-		msg.ReplyMarkup = b.createMainMenu()
-		b.api.Send(msg)
+		b.sendMessageWithMarkup(chatID, fmt.Sprintf("No shows found for: %s", query), b.createMainMenu())
 		return
 	}
 
@@ -34,14 +33,16 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 	var inlineKeyboard [][]tgbotapi.InlineKeyboardButton
 
 	for _, show := range results {
-
 		status := ""
+
 		if show.Status != "" {
-			if show.Status == "Running" || show.Status == "Continuing" {
+			switch show.Status {
+			case "Running":
+			case "Continuing":
 				status = "📺 Running"
-			} else if show.Status == "Ended" {
+			case "Ended":
 				status = "🏁 Ended"
-			} else {
+			default:
 				status = show.Status
 			}
 		}
@@ -58,11 +59,11 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 		)
 
 		if show.Overview != "" {
-
 			overview := stripHTMLTags(show.Overview)
 			if len(overview) > 100 {
 				overview = overview[:97] + "..."
 			}
+
 			text += fmt.Sprintf("\n  %s", overview)
 		}
 
@@ -74,8 +75,10 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 		followed, err := b.dbManager.IsShowFollowed(chatID, show.ID)
 		if err != nil {
 			log.Printf("Error checking if show is followed: %v", err)
+
 			continue
 		}
+
 		var followButton tgbotapi.InlineKeyboardButton
 		if followed {
 			followButton = tgbotapi.NewInlineKeyboardButtonData(
@@ -99,13 +102,7 @@ func (b *Bot) enhanceSearchResults(chatID int64, query string, results []models.
 
 	escapedText := escapeMarkdown(text)
 
-	msg := tgbotapi.NewMessage(chatID, escapedText)
-	msg.ParseMode = "MarkdownV2"
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...)
-	_, err := b.api.Send(msg)
-	if err != nil {
-		log.Printf("Error sending message: %v", err)
-	}
+	b.sendMessageWithMarkup(chatID, escapedText, tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...))
 }
 
 func stripHTMLTags(s string) string {
@@ -117,6 +114,7 @@ func escapeMarkdown(text string) string {
 	for _, char := range specialChars {
 		text = strings.ReplaceAll(text, char, "\\"+char)
 	}
+
 	return text
 }
 
@@ -127,6 +125,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 		results, err := client.SearchShows(query)
 		if err != nil {
 			log.Printf("Error searching shows with %s: %v", providerName, err)
+
 			continue
 		}
 
@@ -135,6 +134,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 
 	if len(allResults) == 0 {
 		b.sendMessage(chatID, fmt.Sprintf("No shows found for query: %s", query))
+
 		return
 	}
 
@@ -152,15 +152,14 @@ func (b *Bot) searchShows(chatID int64, query string) {
 	mergedResults := make([]models.Show, 0)
 
 	for _, shows := range showsByIMDb {
-
 		sort.Slice(shows, func(i, j int) bool {
-
 			iScore := 0
 			jScore := 0
 
 			if shows[i].Overview != "" {
 				iScore += 3
 			}
+
 			if shows[j].Overview != "" {
 				jScore += 3
 			}
@@ -168,6 +167,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 			if shows[i].PosterURL != "" {
 				iScore += 2
 			}
+
 			if shows[j].PosterURL != "" {
 				jScore += 2
 			}
@@ -175,6 +175,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 			if !shows[i].FirstAirDate.IsZero() {
 				iScore++
 			}
+
 			if !shows[j].FirstAirDate.IsZero() {
 				jScore++
 			}
@@ -187,6 +188,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 		showID, err := b.dbManager.StoreShow(&bestShow)
 		if err != nil {
 			log.Printf("Error storing show: %v", err)
+
 			continue
 		}
 
@@ -198,6 +200,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 		showID, err := b.dbManager.StoreShow(&show)
 		if err != nil {
 			log.Printf("Error storing show: %v", err)
+
 			continue
 		}
 
@@ -205,7 +208,7 @@ func (b *Bot) searchShows(chatID int64, query string) {
 		mergedResults = append(mergedResults, show)
 	}
 
-	maxResults := 5
+	maxResults := b.config.Bot.MaxResults
 	if len(mergedResults) > maxResults {
 		mergedResults = mergedResults[:maxResults]
 	}

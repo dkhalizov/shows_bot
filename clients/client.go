@@ -1,6 +1,6 @@
 package clients
 
-import "shows/internal/models"
+import "github.com/dkhalizov/shows/internal/models"
 
 type ShowAPIClient interface {
 	SearchShows(query string) ([]models.Show, error)
