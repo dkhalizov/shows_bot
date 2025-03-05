@@ -72,7 +72,7 @@ func NewManager(config config.Database) (*Manager, error) {
 func (m *Manager) Init() error {
 	if strings.HasPrefix(m.config.DatabaseURL, "postgres") {
 		m.db.Exec("CREATE SCHEMA IF NOT EXISTS shows_bot")
-		//set schema
+		// set schema
 		m.db.Exec("SET search_path TO shows_bot")
 	}
 
@@ -99,20 +99,22 @@ func (m *Manager) StoreUser(user models.User) error {
 }
 
 func (m *Manager) StoreShow(show *models.Show) (string, error) {
+	var existingShow models.Show
 	if show.IMDbID != "" {
-		var existingShow models.Show
+		result := m.db.Where("imdb_id = ? AND imdb_id != ''", show.IMDbID).Find(&existingShow)
 
-		result := m.db.Where("imdb_id = ? AND imdb_id != ''", show.IMDbID).First(&existingShow)
-		if result.Error == nil {
+		if result.Error != nil {
+			return "", fmt.Errorf("failed to find show: %w", result.Error)
+		}
+
+		if existingShow.ID != "" {
 			return existingShow.ID, nil
 		}
 	}
 
-	var existingShow models.Show
-
-	result := m.db.Where("provider = ? AND provider_id = ?", show.Provider, show.ProviderID).First(&existingShow)
+	result := m.db.Where("provider = ? AND provider_id = ?", show.Provider, show.ProviderID).Find(&existingShow)
 	if result.Error == nil {
-		if show.IMDbID != "" && (existingShow.IMDbID == "" || existingShow.IMDbID == "0") {
+		if (show.IMDbID != "" && existingShow.ID != "") && (existingShow.IMDbID == "" || existingShow.IMDbID == "0") {
 			existingShow.IMDbID = show.IMDbID
 			m.db.Save(&existingShow)
 		}
@@ -210,8 +212,12 @@ func (m *Manager) StoreEpisode(episode *models.Episode) (string, error) {
 
 	var existingEpisode models.Episode
 
-	result := m.db.First(&existingEpisode, "id = ?", episode.ID)
-	if result.Error == nil {
+	result := m.db.Find(&existingEpisode, "id = ?", episode.ID)
+	if result.Error != nil {
+		return "", fmt.Errorf("error finding episode: %w", result.Error)
+	}
+
+	if existingEpisode.ID != "" {
 		return existingEpisode.ID, nil
 	}
 
@@ -226,7 +232,7 @@ func (m *Manager) GetNextEpisode(showID string) (*models.Episode, error) {
 	var episode models.Episode
 	result := m.db.Where("show_id = ? AND air_date > ?", showID, time.Now()).
 		Order("air_date").
-		First(&episode)
+		Find(&episode)
 
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -234,6 +240,10 @@ func (m *Manager) GetNextEpisode(showID string) (*models.Episode, error) {
 
 	if result.Error != nil {
 		return nil, result.Error
+	}
+
+	if episode.ID == "" {
+		return nil, nil
 	}
 
 	return &episode, nil

@@ -20,6 +20,7 @@ const (
 	ActionFollow   = "follow"
 	ActionUnfollow = "unfollow"
 	ActionDetails  = "details"
+	ActionEpisodes = "episodes"
 	ActionBack     = "back"
 )
 
@@ -52,6 +53,7 @@ func (b *Bot) createBackHomeRow(backTarget string) []tgbotapi.InlineKeyboardButt
 }
 
 func (b *Bot) editMessageWithMenu(chatID int64, messageID int, text string, markup tgbotapi.InlineKeyboardMarkup) {
+	text = truncateForTelegram(text)
 	text = escapeMarkdown(text)
 	msg := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	msg.ParseMode = "MarkdownV2"
@@ -61,6 +63,17 @@ func (b *Bot) editMessageWithMenu(chatID int64, messageID int, text string, mark
 	if err != nil {
 		slog.Error("failed to edit message", "err", err)
 	}
+}
+
+func truncateForTelegram(text string) string {
+	const maxLength = 4000
+
+	if len(text) > maxLength {
+		// Show only the last part of the text
+		text = "...\n" + text[len(text)-maxLength:]
+	}
+
+	return text
 }
 
 func (b *Bot) displayUserShows(chatID int64, messageID, userID int) {
@@ -163,6 +176,9 @@ func (b *Bot) displayShowDetails(chatID int64, messageID int, showID string, use
 	if following {
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("❌ Unfollow", fmt.Sprintf("%s:%s", ActionUnfollow, show.ID)),
+		))
+		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📋 All Episodes", fmt.Sprintf("%s:%s", ActionEpisodes, show.ID)),
 		))
 	} else {
 		inlineKeyboard = append(inlineKeyboard, tgbotapi.NewInlineKeyboardRow(
@@ -269,4 +285,43 @@ func (b *Bot) displayUpcomingEpisodes(chatID int64, messageID, userID int) {
 		text,
 		tgbotapi.NewInlineKeyboardMarkup(inlineKeyboard...),
 	)
+}
+
+func (b *Bot) displayShowEpisodes(chatID int64, messageID int, showID string) {
+	episodes, err := b.dbManager.GetEpisodesForShow(showID)
+	if err != nil {
+		slog.Error("Error getting episodes", "err", err)
+		b.editMessageWithMenu(
+			chatID,
+			messageID,
+			"An error occurred while fetching episodes details.",
+			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
+		)
+
+		return
+	}
+
+	if len(episodes) == 0 {
+		b.editMessageWithMenu(
+			chatID,
+			messageID,
+			"No episodes found for this show.",
+			tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...),
+		)
+
+		return
+	}
+
+	text := fmt.Sprintf("📋 *All Episodes*\n\n*%s*\n\n", episodes[0].Show.Name)
+
+	for _, episode := range episodes {
+		text += fmt.Sprintf("S%02dE%02d: %s - %s\n",
+			episode.SeasonNumber,
+			episode.EpisodeNumber,
+			episode.Name,
+			episode.AirDate.Format("Jan 2, 2006"),
+		)
+	}
+
+	b.editMessageWithMenu(chatID, messageID, text, tgbotapi.NewInlineKeyboardMarkup(b.createHomeButton()...))
 }

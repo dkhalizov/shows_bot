@@ -51,24 +51,24 @@ func (b *Bot) notifyUsersAboutShowEpisodes(show *models.Show) error {
 		return fmt.Errorf("could not get episodes for show %s :  %w", show.ID, err)
 	}
 
-	slog.Debug("Got episodes", "showID", show.ID, "episodes", episodes)
-
 	for _, episode := range episodes {
 		episode.ShowID = show.ID
 		now := time.Now()
-		fromNow := now.Add(b.config.Bot.EpisodeNotificationThreshold)
-		shouldNotify := episode.AirDate.After(now) && episode.AirDate.Before(fromNow)
+		isFutureEpisode := episode.AirDate.After(now)
 
-		if shouldNotify {
+		if isFutureEpisode {
 			episodeID, err := b.dbManager.StoreEpisode(&episode)
 			if err != nil {
 				slog.Error("Error storing episode", "episodeID", episodeID, "err", err)
-
-				continue
 			}
+		}
+		// notify users if the episode is within the notification threshold
+		fromNow := now.Add(b.config.Bot.EpisodeNotificationThreshold)
+		shouldNotify := isFutureEpisode && episode.AirDate.Before(fromNow)
 
+		if shouldNotify {
 			if err = b.notifyUsersAboutEpisode(show, &episode); err != nil {
-				slog.Error("Error notifying users about episode", "episodeID", episodeID, "err", err)
+				slog.Error("Error notifying users about episode", "episodeID", episode.ID, "err", err)
 
 				continue
 			}

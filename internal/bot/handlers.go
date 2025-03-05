@@ -267,6 +267,11 @@ When you follow a show, you'll receive notifications about new episodes.`
 		b.answerCallback(callbackQuery.ID, responseText)
 
 		go func() {
+			err = b.storeAllEpisodes(show)
+			if err != nil {
+				slog.Error("Error storing episodes", "err", err)
+			}
+
 			if err = b.notifyUsersAboutShowEpisodes(show); err != nil {
 				slog.Error("failed to notify show episodes", "err", err)
 			}
@@ -298,6 +303,9 @@ When you follow a show, you'll receive notifications about new episodes.`
 		b.displayShowDetails(chatID, callbackQuery.Message.MessageID, param, userID)
 		b.answerCallback(callbackQuery.ID, "")
 
+	case ActionEpisodes:
+		b.displayShowEpisodes(chatID, callbackQuery.Message.MessageID, param)
+		b.answerCallback(callbackQuery.ID, "")
 	case ActionBack:
 		switch param {
 		case "search_results":
@@ -322,6 +330,22 @@ When you follow a show, you'll receive notifications about new episodes.`
 		log.Printf("Unknown callback action: %s", action)
 		b.answerCallback(callbackQuery.ID, "Invalid action")
 	}
+}
+
+func (b *Bot) storeAllEpisodes(show *models.Show) error {
+	episodes, err := b.apiClients[show.ProviderID].GetEpisodes(show.ProviderID)
+	if err != nil {
+		return fmt.Errorf("error getting episodes %w", err)
+	}
+
+	for _, episode := range episodes {
+		_, err = b.dbManager.StoreEpisode(&episode)
+		if err != nil {
+			return fmt.Errorf("error storing episode %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (b *Bot) answerCallback(id, text string) {
