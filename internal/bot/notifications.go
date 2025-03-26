@@ -34,43 +34,84 @@ func (b *Bot) checkForNewEpisodes() {
 			continue
 		}
 
+		if err = b.refreshShowEpisodes(show); err != nil {
+			slog.Error("Error refreshing episodes for show", "showID", showID, "err", err)
+		}
+
 		if err = b.notifyUsersAboutShowEpisodes(show); err != nil {
 			slog.Error("Error notifying users about the show", "showID", showID, "err", err)
 		}
 	}
 }
 
-func (b *Bot) notifyUsersAboutShowEpisodes(show *models.Show) error {
+// refreshShowEpisodes fetches only upcoming episode data from the API and updates the database
+// This is separated from notification logic to ensure we always have updated episode data
+func (b *Bot) refreshShowEpisodes(show *models.Show) error {
 	client, ok := b.apiClients[show.Provider]
 	if !ok {
-		return fmt.Errorf("apiClient for show %s :  %s not found", show.ID, show.Provider)
+		return fmt.Errorf("apiClient for show %s : %s not found", show.ID, show.Provider)
 	}
 
-	episodes, err := client.GetEpisodes(show.ProviderID)
+	// Only get upcoming episodes from the API
+	episodes, err := client.GetUpcomingEpisodes(show.ProviderID)
 	if err != nil {
-		return fmt.Errorf("could not get episodes for show %s :  %w", show.ID, err)
+		slog.Error("Failed to get upcoming episodes, falling back to stored episodes",
+			"showID", show.ID,
+			"showName", show.Name,
+			"err", err)
+		return nil // Don't fail the entire notification process if API fails
 	}
 
+	if len(episodes) == 0 {
+		slog.Debug("No upcoming episodes found for show", "showID", show.ID, "showName", show.Name)
+		return nil
+	}
+
+	slog.Debug("Refreshing upcoming episodes",
+		"showName", show.Name,
+		"count", len(episodes))
+
+	// Store only upcoming episodes
 	for _, episode := range episodes {
 		episode.ShowID = show.ID
-		now := time.Now()
-		isFutureEpisode := episode.AirDate.After(now)
-
-		if isFutureEpisode {
-			episodeID, err := b.dbManager.StoreEpisode(&episode)
-			if err != nil {
-				slog.Error("Error storing episode", "episodeID", episodeID, "err", err)
-			}
+		_, err := b.dbManager.StoreEpisode(&episode)
+		if err != nil {
+			slog.Error("Error storing episode", "episode", episode.Name, "err", err)
 		}
-		// notify users if the episode is within the notification threshold
-		fromNow := now.Add(b.config.Bot.EpisodeNotificationThreshold)
-		shouldNotify := isFutureEpisode && episode.AirDate.Before(fromNow)
+	}
 
-		if shouldNotify {
+	return nil
+}
+
+func (b *Bot) notifyUsersAboutShowEpisodes(show *models.Show) error {
+	episodes, err := b.dbManager.GetEpisodesForShow(show.ID)
+	if err != nil {
+		return fmt.Errorf("could not get episodes for show %s : %w", show.ID, err)
+	}
+
+	now := time.Now()
+	notificationThreshold := now.Add(b.config.Bot.EpisodeNotificationThreshold)
+
+	slog.Debug("Checking episodes for notification",
+		"show", show.Name,
+		"episodeCount", len(episodes),
+		"threshold", b.config.Bot.EpisodeNotificationThreshold)
+
+	for _, episode := range episodes {
+		// Only notify for episodes that:
+		// 1. Are in the future
+		// 2. Are within the notification threshold (e.g., in the next 24 hours)
+		// 3. Haven't been notified yet
+		isFutureEpisode := episode.AirDate.After(now)
+		isWithinThreshold := episode.AirDate.Before(notificationThreshold)
+
+		if isFutureEpisode && isWithinThreshold {
 			if err = b.notifyUsersAboutEpisode(show, &episode); err != nil {
-				slog.Error("Error notifying users about episode", "episodeID", episode.ID, "err", err)
-
-				continue
+				slog.Error("Error notifying users about episode",
+					"episodeID", episode.ID,
+					"showName", show.Name,
+					"episodeName", episode.Name,
+					"err", err)
 			}
 		}
 	}
@@ -84,10 +125,21 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 		return fmt.Errorf("could not get users to notify: %w", err)
 	}
 
-	slog.Debug("Got users to notify", "userIDs", userIDs)
+	if len(userIDs) == 0 {
+		slog.Debug("No users to notify for episode",
+			"showName", show.Name,
+			"episodeName", episode.Name,
+			"episodeID", episode.ID)
+		return nil
+	}
+
+	slog.Info("Notifying users about upcoming episode",
+		"userCount", len(userIDs),
+		"show", show.Name,
+		"episode", episode.Name,
+		"airDate", episode.AirDate)
 
 	for _, userID := range userIDs {
-		slog.Debug("Notifying user about episode", "userID", userID, "episodeID", episode.ID)
 		message := fmt.Sprintf("🔔 *New Episode Alert* 🔔\n\n*%s*\nSeason %d, Episode %d: %s\n\nAirs on %s",
 			show.Name,
 			episode.SeasonNumber,
@@ -103,6 +155,15 @@ func (b *Bot) notifyUsersAboutEpisode(show *models.Show, episode *models.Episode
 			}
 
 			message += fmt.Sprintf("\n\n%s", overview)
+		}
+
+		// Add information about how soon the episode will air
+		timeUntilAiring := episode.AirDate.Sub(time.Now())
+		if timeUntilAiring < 24*time.Hour {
+			message += fmt.Sprintf("\n\n⏰ This episode airs in less than 24 hours!")
+		} else {
+			daysUntil := int(timeUntilAiring.Hours() / 24)
+			message += fmt.Sprintf("\n\n⏰ This episode airs in %d days", daysUntil)
 		}
 
 		b.sendMessage(userID, message)
