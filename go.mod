@@ -220,7 +220,7 @@ require (
 	golang.org/x/telemetry v0.0.0-20241220003058-cc96b6e0d3d9 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
-	golang.org/x/tools/gopls v0.18.0-pre.1 // indirect
+	golang.org/x/tools/gopls v0.18.1 // indirect
 	golang.org/x/vuln v1.1.4 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
