@@ -333,12 +333,13 @@ When you follow a show, you'll receive notifications about new episodes.`
 }
 
 func (b *Bot) storeAllEpisodes(show *models.Show) error {
-	episodes, err := b.apiClients[show.ProviderID].GetEpisodes(show.ProviderID)
+	episodes, err := b.apiClients[show.Provider].GetEpisodes(show.ProviderID)
 	if err != nil {
 		return fmt.Errorf("error getting episodes %w", err)
 	}
 
 	for _, episode := range episodes {
+		episode.Show = *show
 		_, err = b.dbManager.StoreEpisode(&episode)
 		if err != nil {
 			return fmt.Errorf("error storing episode %w", err)

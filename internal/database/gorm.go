@@ -113,7 +113,7 @@ func (m *Manager) StoreShow(show *models.Show) (string, error) {
 	}
 
 	result := m.db.Where("provider = ? AND provider_id = ?", show.Provider, show.ProviderID).Find(&existingShow)
-	if result.Error == nil {
+	if result.Error == nil && existingShow.ID != "" {
 		if (show.IMDbID != "" && existingShow.ID != "") && (existingShow.IMDbID == "" || existingShow.IMDbID == "0") {
 			existingShow.IMDbID = show.IMDbID
 			m.db.Save(&existingShow)
