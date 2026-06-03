@@ -2,7 +2,7 @@ module github.com/dkhalizov/shows
 
 go 1.24.2
 
-toolchain go1.26.3
+toolchain go1.26.4
 
 require (
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
